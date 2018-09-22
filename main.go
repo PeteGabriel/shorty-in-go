@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 	"regexp"
@@ -24,7 +23,8 @@ func main() {
 
 // POST /shorten
 func newShortCode(w http.ResponseWriter, r *http.Request) {
-	if err := require(r.Method == http.MethodPost, func() { http.NotFound(w, r) }); err != nil {
+	if r.Method != http.MethodPost {
+		http.NotFound(w, r)
 		return
 	}
 
@@ -41,25 +41,21 @@ func newShortCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := Code{}
-	err := json.NewDecoder(r.Body).Decode(&data)
+	code := Code{}
+	err := json.NewDecoder(r.Body).Decode(&code)
 	if err != nil {
 		writeCustomHeader(w, http.StatusNotFound)
 		return
 	}
 
-	code := Code{}
-	if data.Url == "" {
+	if code.Url == "" {
 		writeCustomHeader(w, http.StatusBadRequest)
 		return
 	}
 	//todo find another way
-	if data.Shortcode == "" {
+	if code.Shortcode == "" {
 		code.Shortcode = genCode()
-	} else {
-		code.Shortcode = data.Shortcode
 	}
-	code.Url = data.Url
 	codes[code.Shortcode] = code
 
 	writeCustomHeader(w, http.StatusCreated)
@@ -68,32 +64,33 @@ func newShortCode(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//GET /:code
 func getShortenCode(w http.ResponseWriter, r *http.Request) {
-	if err := require(r.Method == http.MethodGet, func() { http.NotFound(w, r) }); err != nil {
+	if r.Method != http.MethodGet {
+		http.NotFound(w, r)
 		return
 	}
 
 	vreg := regexp.MustCompile("^/([0-9a-zA-Z_]+)$")
 	if m := vreg.FindStringSubmatch(r.URL.Path); m != nil {
 		if v, ok := codes[m[1]]; ok {
-			http.Redirect(w, r, v.Url, http.StatusFound)
-		} else {
-			http.NotFound(w, r)
+			w.Header().Set("Content-Type", mediatype)
+			w.Header().Set("Location", v.Url)
+			w.WriteHeader(http.StatusFound)
+			return
 		}
-	} else {
-		http.NotFound(w, r)
+		//TODO add better response
+		writeCustomHeader(w, http.StatusNotFound)
+		resp := ApiError{
+			Error: http.StatusNotFound,
+			Desc:  "The shortcode cannot be found in the system",
+		}
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			panic(err)
+		}
 	}
 
-}
-
-// If pred is not true, resolve function ifFalse
-// and an error is returned if so.
-func require(pred bool, ifFalse func()) error {
-	if !pred {
-		ifFalse()
-		return errors.New("Require clause not valid")
-	}
-	return nil
+	http.NotFound(w, r)
 }
 
 func writeCustomHeader(w http.ResponseWriter, code int) {
