@@ -8,6 +8,10 @@ type Code struct {
 	Shortcode string `json:"shortcode"`
 }
 
+type CodeDto struct {
+	Shortcode string `json:"shortcode"`
+}
+
 /*
 ApiError ..
 */
