@@ -13,16 +13,19 @@ var mediatype = "application/json"
 
 var codes map[string]Code
 
-func main() {
+func init() {
 	codes = make(map[string]Code)
-	http.HandleFunc("/", Logger(getShortenCode, "Get shortcode by name"))
-	http.HandleFunc("/shorten", Logger(newShortCode, "Create new shortcode"))
+}
+
+func main() {
+	http.HandleFunc("/", Logger(GetShortenCode, "Get shortcode by name"))
+	http.HandleFunc("/shorten", Logger(CreateShortCode, "Create new shortcode"))
 
 	log.Fatal(http.ListenAndServe(":8000", nil))
 }
 
 // POST /shorten
-func newShortCode(w http.ResponseWriter, r *http.Request) {
+func CreateShortCode(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.NotFound(w, r)
 		return
@@ -65,7 +68,7 @@ func newShortCode(w http.ResponseWriter, r *http.Request) {
 }
 
 //GET /:code
-func getShortenCode(w http.ResponseWriter, r *http.Request) {
+func GetShortenCode(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.NotFound(w, r)
 		return
