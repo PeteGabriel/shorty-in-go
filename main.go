@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"regexp"
 
@@ -18,23 +17,24 @@ func init() {
 }
 
 func main() {
-	http.HandleFunc("/", Logger(GetShortenCode, "Get shortcode by name"))
-	http.HandleFunc("/shorten", Logger(CreateShortCode, "Create new shortcode"))
 
-	log.Fatal(http.ListenAndServe(":8000", nil))
+	a := App{}
+	//TODO this should go into env vars
+	a.Initialize("dummy0", "dummy1", "dummy2")
+	a.Run(":8080")
 }
 
 // POST /shorten
 func CreateShortCode(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.NotFound(w, r)
+		handleInvalidMethod(w)
 		return
 	}
 
 	vreg := regexp.MustCompile("^/([0-9a-zA-Z_]){4,}$")
 	if m := vreg.FindStringSubmatch(r.URL.Path); m == nil {
 		writeCustomHeader(w, http.StatusUnprocessableEntity)
-		resp := ApiError{
+		resp := APIError{
 			Error: http.StatusUnprocessableEntity,
 			Desc:  "The shortcode fails to meet the following regexp: ^[0-9a-zA-Z_]{4,}$.",
 		}
@@ -70,6 +70,7 @@ func CreateShortCode(w http.ResponseWriter, r *http.Request) {
 //GET /:code
 func GetShortenCode(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		//TODO change to return api error
 		http.NotFound(w, r)
 		return
 	}
@@ -84,7 +85,7 @@ func GetShortenCode(w http.ResponseWriter, r *http.Request) {
 		}
 		//TODO add better response
 		writeCustomHeader(w, http.StatusNotFound)
-		resp := ApiError{
+		resp := APIError{
 			Error: http.StatusNotFound,
 			Desc:  "The shortcode cannot be found in the system",
 		}
@@ -113,4 +114,15 @@ func genCode() string {
 	}
 
 	return c
+}
+
+func handleInvalidMethod(w http.ResponseWriter) {
+	writeCustomHeader(w, http.StatusNotFound)
+	resp := APIError{
+		Error: http.StatusNotFound,
+		Desc:  "Resource not found",
+	}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		panic(err)
+	}
 }
