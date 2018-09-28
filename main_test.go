@@ -21,7 +21,6 @@ func TestGetCodeWithWrongHttpMethod_ExpectNotFound(t *testing.T) {
 
 	assertWhenError(rr, t)
 }
-
 func TestGetCodeNotPresent_ExpectNotFound(t *testing.T) {
 	req, err := http.NewRequest("GET", "/NotExistingCode", nil)
 	if err != nil {
@@ -34,22 +33,6 @@ func TestGetCodeNotPresent_ExpectNotFound(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertWhenError(rr, t)
-}
-
-func assertWhenError(rr *httptest.ResponseRecorder, t *testing.T) {
-	if status := rr.Code; status != http.StatusNotFound {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusNotFound)
-	}
-	if mediatype := rr.Header().Get("Content-Type"); mediatype != "application/json" {
-		t.Errorf("handler returned wrong mediatype: got %v want %v",
-			mediatype,
-			"application/json")
-	}
-	resp := ApiError{}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Error("Handler must respond with valid content")
-	}
 }
 func TestPostNewCodeWithWrongHttpMethod_ExpectNotFound(t *testing.T) {
 	var code = "{\"url\":\"www.example.com\",\"shortcode\":\"exp\"}"
@@ -65,7 +48,6 @@ func TestPostNewCodeWithWrongHttpMethod_ExpectNotFound(t *testing.T) {
 
 	assertWhenError(rr, t)
 }
-
 func TestPostNewCodeNotPresent_ExpectCreated(t *testing.T) {
 	var code = "{\"url\":\"www.example.com\",\"shortcode\":\"exp\"}"
 	req, err := http.NewRequest("POST", "/shorten", strings.NewReader(code))
@@ -82,9 +64,37 @@ func TestPostNewCodeNotPresent_ExpectCreated(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusCreated)
 	}
-	if mediatype := rr.Header().Get("Content-Type"); mediatype != "application/json" {
+
+	checkMediatype(t, rr.Header().Get("Content-Type"))
+}
+func TestPostNewCodeBadRequest_ExpectBadRequest(t *testing.T) {
+
+}
+
+/*********************************
+* Utility methods
+**********************************/
+
+func checkResponseCode(t *testing.T, expected, actual int) {
+	if expected != actual {
+		t.Errorf("Expected response code %d. Got %d\n", expected, actual)
+	}
+}
+
+func checkMediatype(t *testing.T, actual string) {
+	if actual != "application/json" {
 		t.Errorf("handler returned wrong mediatype: got %v want %v",
-			mediatype,
-			"application/json")
+			actual, "application/json")
+	}
+}
+
+func assertWhenError(rr *httptest.ResponseRecorder, t *testing.T) {
+	checkResponseCode(t, http.StatusNotFound, rr.Code)
+
+	checkMediatype(t, rr.Header().Get("Content-Type"))
+
+	resp := APIError{}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Error("Handler must respond with valid content")
 	}
 }

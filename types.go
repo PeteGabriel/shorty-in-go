@@ -12,6 +12,7 @@ type Code struct {
 
 // CodeDto type should be used when answering some request.
 type CodeDto struct {
+	Url       string `json:"url"`
 	Shortcode string `json:"shortcode"`
 }
 
