@@ -13,6 +13,15 @@ import (
 const (
 	GET  = "GET"
 	POST = "POST"
+
+	ResNotFound    = "Resource not found"
+	ContentHeader  = "Content-Type"
+	MediaType      = "application/json"
+	LocationHeader = "Location"
+
+	ShouldBeValidCode = "The shortcode provided must comply with ([0-9a-zA-Z]+)$"
+	CodeNotFound      = "The shortcode cannot be found in the system"
+	CodeIsInvalid     = "The shortcode fails to meet the following regexp: ^[0-9a-zA-Z_]{4,}$."
 )
 
 var codes map[string]Code
@@ -20,8 +29,6 @@ var codes map[string]Code
 type App struct {
 	Router *mux.Router
 }
-
-var mediatype = "application/json"
 
 func init() {
 	codes = make(map[string]Code)
@@ -44,32 +51,41 @@ func (a *App) Run(addr string) {
 //GET /:code
 func GetShortenCode(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		//TODO change to return api error
-		http.NotFound(w, r)
+		writeCustomHeader(w, http.StatusNotFound)
+		resp := buildErrMsg(http.StatusNotFound, ResNotFound)
+
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			panic(err)
+		}
 		return
 	}
 	// map of parameters
 	sc := mux.Vars(r)["shortcode"]
 
-	vreg := regexp.MustCompile("([0-9a-zA-Z_]+)$")
+	vreg := regexp.MustCompile("([0-9a-zA-Z]+)$")
 	if m := vreg.FindStringSubmatch(sc); m != nil {
 		if v, ok := codes[m[1]]; ok {
-			w.Header().Set("Content-Type", mediatype)
-			w.Header().Set("Location", v.Url)
+			w.Header().Set(ContentHeader, MediaType)
+			w.Header().Set(LocationHeader, v.Url)
 			w.WriteHeader(http.StatusFound)
 			return
 		}
 		//TODO add better response
 		writeCustomHeader(w, http.StatusNotFound)
-		resp := APIError{
-			Error: http.StatusNotFound,
-			Desc:  "The shortcode cannot be found in the system",
-		}
+		resp := buildErrMsg(http.StatusNotFound, CodeNotFound)
+
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			panic(err)
 		}
+		return
 	}
-	//TODO Handle the fact that reqeust was poorly made
+	//BadRequest since code provided does not comply with regex
+	writeCustomHeader(w, http.StatusBadRequest)
+	resp := buildErrMsg(http.StatusBadRequest, ShouldBeValidCode)
+
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		panic(err)
+	}
 }
 
 // POST /shorten
@@ -82,10 +98,8 @@ func CreateShortCode(w http.ResponseWriter, r *http.Request) {
 	vreg := regexp.MustCompile("^/([0-9a-zA-Z_]){4,}$")
 	if m := vreg.FindStringSubmatch(r.URL.Path); m == nil {
 		writeCustomHeader(w, http.StatusUnprocessableEntity)
-		resp := APIError{
-			Error: http.StatusUnprocessableEntity,
-			Desc:  "The shortcode fails to meet the following regexp: ^[0-9a-zA-Z_]{4,}$.",
-		}
+		resp := buildErrMsg(http.StatusUnprocessableEntity, CodeIsInvalid)
+
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			panic(err)
 		}
@@ -132,17 +146,21 @@ func genCode() string {
 }
 
 func writeCustomHeader(w http.ResponseWriter, code int) {
-	w.Header().Set("Content-Type", mediatype)
+	w.Header().Set(ContentHeader, MediaType)
 	w.WriteHeader(code)
 }
 
 func handleInvalidMethod(w http.ResponseWriter) {
 	writeCustomHeader(w, http.StatusNotFound)
-	resp := APIError{
-		Error: http.StatusNotFound,
-		Desc:  "Resource not found",
-	}
+	resp := buildErrMsg(http.StatusNotFound, ResNotFound)
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		panic(err)
+	}
+}
+
+func buildErrMsg(code int, desc string) APIError {
+	return APIError{
+		Error: code,
+		Desc:  desc,
 	}
 }

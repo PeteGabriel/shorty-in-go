@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestGetCodeWithWrongHttpMethod_ExpectNotFound(t *testing.T) {
+func TestGetCode_WithWrongHttpMethod_ExpectNotFound(t *testing.T) {
 	req, err := http.NewRequest("PUT", "/shorten", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +34,22 @@ func TestGetCodeNotPresent_ExpectNotFound(t *testing.T) {
 
 	assertWhenError(rr, t)
 }
-func TestPostNewCodeWithWrongHttpMethod_ExpectNotFound(t *testing.T) {
+
+func TestGetCodeNotCompliant_ExpectBadRequest(t *testing.T) {
+	req, err := http.NewRequest("GET", "/_", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(GetShortenCode)
+
+	handler.ServeHTTP(rr, req)
+
+	assertWhenError(rr, t)
+}
+
+func TestPostNewCode_WithWrongHttpMethod_ExpectNotFound(t *testing.T) {
 	var code = "{\"url\":\"www.example.com\",\"shortcode\":\"exp\"}"
 	req, err := http.NewRequest("PUT", "/shorten", strings.NewReader(code))
 	if err != nil {
@@ -48,7 +63,7 @@ func TestPostNewCodeWithWrongHttpMethod_ExpectNotFound(t *testing.T) {
 
 	assertWhenError(rr, t)
 }
-func TestPostNewCodeNotPresent_ExpectCreated(t *testing.T) {
+func TestPostNewCode_NotPresent_ExpectCreated(t *testing.T) {
 	var code = "{\"url\":\"www.example.com\",\"shortcode\":\"exp\"}"
 	req, err := http.NewRequest("POST", "/shorten", strings.NewReader(code))
 	if err != nil {
@@ -67,7 +82,7 @@ func TestPostNewCodeNotPresent_ExpectCreated(t *testing.T) {
 
 	checkMediatype(t, rr.Header().Get("Content-Type"))
 }
-func TestPostNewCodeBadRequest_ExpectBadRequest(t *testing.T) {
+func TestPostNewCode_BadRequest_ExpectBadRequest(t *testing.T) {
 
 }
 
@@ -88,6 +103,9 @@ func checkMediatype(t *testing.T, actual string) {
 	}
 }
 
+//TODO write a wrapper to encapsulate code usage
+// assertWhenError(rr, t, http.StatusNotFound)
+
 func assertWhenError(rr *httptest.ResponseRecorder, t *testing.T) {
 	checkResponseCode(t, http.StatusNotFound, rr.Code)
 
@@ -96,5 +114,9 @@ func assertWhenError(rr *httptest.ResponseRecorder, t *testing.T) {
 	resp := APIError{}
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Error("Handler must respond with valid content")
+	}
+
+	if resp.Desc != "Resource not found" {
+		t.Error("Response description field its not correct.")
 	}
 }
